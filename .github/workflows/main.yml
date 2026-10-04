@@ -30,6 +30,19 @@ jobs:
           cp pubspec.yaml build_app/pubspec.yaml
           sed -i 's/android:label="[^"]*"/android:label="Sites Check"/' build_app/android/app/src/main/AndroidManifest.xml
 
+      - name: Let plugins compile against Android 36
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/sdk.gradle <<'EOF'
+          allprojects {
+            afterEvaluate { p ->
+              if (p.hasProperty('android') && p.name != 'app') {
+                p.android.compileSdkVersion 36
+              }
+            }
+          }
+          EOF
+
       - name: Build release APK
         working-directory: build_app
         run: |
