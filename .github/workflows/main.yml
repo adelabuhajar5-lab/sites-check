@@ -25,7 +25,8 @@ jobs:
         run: |
           flutter create --platforms=android --org com.sitescheck --project-name sites_check build_app
           rm -rf build_app/lib build_app/test
-          cp -r lib build_app/lib
+          mkdir build_app/lib
+          cp *.dart build_app/lib/
           cp pubspec.yaml build_app/pubspec.yaml
           sed -i 's/android:label="[^"]*"/android:label="Sites Check"/' build_app/android/app/src/main/AndroidManifest.xml
 
