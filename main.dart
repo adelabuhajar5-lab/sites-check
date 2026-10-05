@@ -5,9 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'search_box.dart';
 import 'site_book.dart';
+
+// stc-style colours (change here to re-colour the whole app)
+const Color kStcPurple = Color(0xFF4F008C); // main colour
+const Color kStcCoral = Color(0xFFFF375E); // accent colour
+const Color kStcTint = Color(0xFFEBDDF5); // light purple for labels / selections
+const Color kPageBg = Color(0xFFF5F1F9); // page background
+
+const int _latCol = 8; // column I
+const int _longCol = 9; // column J
 
 void main() => runApp(const SitesCheckApp());
 
@@ -21,7 +31,20 @@ class SitesCheckApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: const Color(0xFF1F5F8B),
+        colorScheme: ColorScheme.fromSeed(seedColor: kStcPurple).copyWith(
+          primary: kStcPurple,
+          onPrimary: Colors.white,
+          secondary: kStcCoral,
+          onSecondary: Colors.white,
+          primaryContainer: kStcTint,
+          onPrimaryContainer: kStcPurple,
+        ),
+        scaffoldBackgroundColor: kPageBg,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kStcPurple,
+          foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+        ),
       ),
       home: const HomePage(),
     );
@@ -239,6 +262,42 @@ class _HomePageState extends State<HomePage> {
     return [for (final f in kFields) fmt(f.col, row[f.col])];
   }
 
+  double? _toCoord(Object? v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.trim().replaceAll(',', '.'));
+    return null;
+  }
+
+  void _snack(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// Opens Google Maps with a pin on the Lat / Long of the selected record.
+  Future<void> _openMap() async {
+    final book = _book;
+    if (book == null || _matches.isEmpty) return;
+    final row = book.rows[_matches[_matchI]];
+    final lat = _toCoord(row[_latCol]);
+    final lng = _toCoord(row[_longCol]);
+    if (lat == null ||
+        lng == null ||
+        (lat == 0 && lng == 0) ||
+        lat.abs() > 90 ||
+        lng.abs() > 180) {
+      _snack('This record has no valid Lat / Long.');
+      return;
+    }
+    final uri =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!opened) _snack('Could not open Google Maps.');
+  }
+
   Future<void> _copyResult() async {
     final values = _currentValues();
     if (values.isEmpty) return;
@@ -257,8 +316,8 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sites Check'),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        title: const Text('Sites Check',
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: LayoutBuilder(builder: (context, c) {
@@ -396,6 +455,8 @@ class _HomePageState extends State<HomePage> {
     }
 
     return Card(
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -403,10 +464,8 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Search',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold, color: kStcPurple)),
             Text('Type part of a value, then pick it from the list.',
                 style: TextStyle(color: Theme.of(context).hintColor)),
             const SizedBox(height: 12),
@@ -485,15 +544,32 @@ class _HomePageState extends State<HomePage> {
     }
 
     return Card(
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Result',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Result',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold, color: kStcPurple)),
+                ),
+                FilledButton.icon(
+                  onPressed: n > 0 ? _openMap : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kStcCoral,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.location_on, size: 20),
+                  label: const Text('Open in Google Maps'),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             header,
             const SizedBox(height: 8),
@@ -525,12 +601,14 @@ class _FieldRow extends StatelessWidget {
               width: 112,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
+                color: kStcTint,
                 border: border,
               ),
               child: Text(label,
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: kStcPurple)),
             ),
             Expanded(
               child: Container(
